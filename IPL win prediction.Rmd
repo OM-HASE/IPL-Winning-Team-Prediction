@@ -1,0 +1,682 @@
+---
+title: 'IPL Win Prediction '
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+library(dplyr)
+library(skimr)
+library(knitr)
+library(lubridate)
+library(tibble)
+library(tidyr)
+library(ggplot2)
+library(plotly)
+library(reshape2)
+library(ggthemes)
+library(stringr)
+library(caret)
+library(randomForest)
+library(e1071)
+library(rpart)
+library(pROC)
+```
+
+```{r}
+matches<-read.csv("C:/Users/omhas/Documents/IPL Project/Dataset/matches.csv")
+head(matches)
+```
+
+```{r}
+summarise(matches, ID = n_distinct(id), Season = n_distinct(season),City = n_distinct(city), Date = n_distinct(date), Match_Type = n_distinct(match_type), Player_Of_Matches = n_distinct(player_of_match), Venue = n_distinct(venue), Total_Teams = n_distinct(team1),Total_Umpire = n_distinct(umpire1))
+```
+
+
+```{r}
+# Overview of data structure
+glimpse(matches)
+# Missing values
+kable(data.frame(Missing_Values = colSums(is.na(matches))), caption = "Missing Values in Each Column")
+# Detailed skim summary
+skim(matches)
+```
+
+```{r}
+missing_winning_team <- matches[is.na(matches$winner),]
+missing_winning_team
+#These matches has no Result becomes matches are stopped due to Rain or other reasons
+```
+
+```{r}
+# Remove the 'City', 'ID', and 'method' columns from the data frame
+matches <- matches[, !(names(matches) %in% c("city", "id", "method"))]
+matches <- na.omit(matches)
+head(matches)
+```
+
+```{r}
+# Convert the 'Date' column to a Date type
+matches$date <- as.Date(matches$date, format = "%Y-%m-%d")
+#Create 'SEASON_START_INT' column by extracting the first four characters from 'Season' and converting to integer
+matches$SEASON_START_INT <- as.integer(substr(matches$season, 1, 4))
+  
+# Create 'SEASON_END_INT' column based on the length of the 'Season' value
+matches$SEASON_END_INT <- ifelse(nchar(matches$season) > 5, as.integer(paste0("20", substr(matches$season, 6, 7))), matches$SEASON_START_INT)
+matches <- matches[, !(names(matches) %in% "season")]
+head(matches)
+```
+
+```{r}
+unique(matches$winner)
+```
+
+```{r}
+# Replace occurrences of 'Delhi Daredevils' with 'Delhi Capitals'
+matches$team1 <- gsub('Delhi Daredevils', 'Delhi Capitals', matches$team1)
+matches$team2 <- gsub('Delhi Daredevils', 'Delhi Capitals', matches$team2)
+matches$winner <- gsub('Delhi Daredevils', 'Delhi Capitals', matches$winner)
+
+# Replace occurrences of 'Kings XI Punjab' with 'Punjab Kings'
+matches$team1 <- gsub('Kings XI Punjab', 'Punjab Kings', matches$team1)
+matches$team2 <- gsub('Kings XI Punjab', 'Punjab Kings', matches$team2)
+matches$winner <- gsub('Kings XI Punjab', 'Punjab Kings', matches$winner)
+
+# Replace occurrences of 'Deccan Chargers' with 'Sunrisers Hyderabad'
+matches$team1 <- gsub('Deccan Chargers', 'Sunrisers Hyderabad', matches$team1)
+matches$team2 <- gsub('Deccan Chargers', 'Sunrisers Hyderabad', matches$team2)
+matches$winner <- gsub('Deccan Chargers', 'Sunrisers Hyderabad', matches$winner)
+
+# Replace occurrences of 'Rising Pune Supergiant' with 'Pune Warriors'
+matches$team1 <- gsub('Rising Pune Supergiant', 'Pune Warriors', matches$team1)
+matches$team2 <- gsub('Rising Pune Supergiant', 'Pune Warriors', matches$team2)
+matches$winner <- gsub('Rising Pune Supergiant', 'Pune Warriors', matches$winner)
+
+# Replace occurrences of 'Rising Pune Supergiants' with 'Pune Warriors'
+matches$team1 <- gsub('Rising Pune Supergiants', 'Pune Warriors', matches$team1)
+matches$team2 <- gsub('Rising Pune Supergiants', 'Pune Warriors', matches$team2)
+matches$winner <- gsub('Rising Pune Supergiants', 'Pune Warriors', matches$winner)
+
+# Replace occurrences of 'Gujarat Lions' with 'Gujarat Titans'
+matches$team1 <- gsub('Gujarat Lions', 'Gujarat Titans', matches$team1)
+matches$team2 <- gsub('Gujarat Lions', 'Gujarat Titans', matches$team2)
+matches$winner <- gsub('Gujarat Lions', 'Gujarat Titans', matches$winner)
+
+head(matches)
+```
+
+```{r}
+
+unique(matches$winner)
+```
+
+
+```{r}
+deliveries<-read.csv("C:/Users/omhas/Documents/IPL Project/Dataset/deliveries.csv")
+head(deliveries)
+```
+
+```{r}
+
+```
+
+
+```{r}
+# Overview of data structure
+glimpse(deliveries)
+# Missing values
+kable(data.frame(Missing_Values = colSums(is.na(deliveries))), caption = "Missing Values in Each Column")
+# Detailed skim summary
+skim(deliveries)
+```
+
+```{r}
+# Group the data by 'batter' and how much Ball he had played, no. of inning, no. of runs, Batting Avg, Strike Rate.
+batstatic <- deliveries %>% group_by(batter) %>% summarise(Total_Inning = sum(n_distinct(inning)), Total_Balls = n(), Total_Runs = sum(batsman_runs, na.rm = TRUE), Total_0_Runs = sum(batsman_runs == 0, na.rm = TRUE), Total_1_Runs = sum(batsman_runs == 1, na.rm = TRUE), Total_2_Runs = sum(batsman_runs == 2, na.rm = TRUE), Total_3_Runs = sum(batsman_runs == 3, na.rm = TRUE), Total_4_Runs = sum(batsman_runs == 4, na.rm = TRUE), Total_6_Runs = sum(batsman_runs == 6, na.rm = TRUE), Player_Out = sum(is_wicket, na.rm = TRUE), Batting_Avg = round(Total_Runs / Player_Out, 2), Strike_Rate = round(Total_Runs/Total_Balls*100, 2))
+head(batstatic)
+```
+
+```{r}
+# Group the data by 'Bowler' and how much Bowls he had Throws, Wicket, Over etc
+ballstatic<-deliveries %>% group_by(bowler) %>% summarise(Balls_Throws = n(), Wicket = sum(dismissal_kind %in% c('caught', 'bowled', 'lbw', 'stumped', 'caught and bowled', 'hit wicket')), Over = round(Balls_Throws/6), Runs_Conceded = sum(batsman_runs, na.rm = TRUE), Extras = sum(ifelse(extras_type %in% c('wides', 'noballs'), extra_runs, 0), na.rm = TRUE), Bowling_Eco = round(Runs_Conceded/Over,2), Bowl_Strike_Rate = round(Balls_Throws/Wicket,2)) %>% mutate(Runs_Conceded = Runs_Conceded + Extras)
+ballstatic
+```
+
+```{r}
+# Initialize an empty list to store players and their matches
+players_matches_dict <- list()
+
+# Iterate over each row in the 'deliveries' dataframe
+for (i in 1:nrow(deliveries)) {
+  row <- deliveries[i, ]
+  
+  batter <- as.character(row$batter)
+  non_striker <- as.character(row$non_striker)
+  bowler <- as.character(row$bowler)
+  
+  players_matches_dict[[batter]] <- unique(c(players_matches_dict[[batter]], row$match_id))
+  players_matches_dict[[non_striker]] <- unique(c(players_matches_dict[[non_striker]], row$match_id))
+  players_matches_dict[[bowler]] <- unique(c(players_matches_dict[[bowler]], row$match_id))
+}
+
+# Convert the list to a data frame
+final_players_matches <- data.frame(Players = names(players_matches_dict), Matches = sapply(players_matches_dict, length))
+
+# Sort by player names
+final_players_matches <- final_players_matches %>% arrange(Players)
+head(final_players_matches)
+
+```
+
+```{r}
+# Filter for 'caught and bowled' for bowlers
+outbyCatch <- deliveries %>% filter(dismissal_kind == "caught and bowled") %>% group_by(bowler) %>% summarise(bowler_catches = n())
+
+# Filter for 'caught' for fielders
+justCatch <- deliveries %>% filter(dismissal_kind == "caught") %>% group_by(fielder = fielder) %>% summarise(fielder_catches = n())
+
+# Merge both dataframes on the common column (bowler for outbyCatch, fielder for justCatch)
+catchDf <- full_join(outbyCatch, justCatch, by = c("bowler" = "fielder"))
+
+# Replace NA values with 0
+catchDf[is.na(catchDf)] <- 0
+
+# Add a new column for total catches
+catchDf <- catchDf %>% mutate(catches = bowler_catches + fielder_catches)
+
+# Drop the individual 'bowler_catches' and 'fielder_catches' columns
+catchDf <- catchDf %>% select(bowler, catches)
+
+# Display the result
+head(catchDf)
+
+```
+
+```{r}
+# Merging Batsman Stats
+final_df <- full_join(final_players_matches, batstatic, by = c("Players" = "batter"))
+
+# Merging Bowler Stats
+final_df <- full_join(final_df, ballstatic, by = c("Players" = "bowler"))
+
+# Merging Catches Stats
+final_df <- full_join(final_df, catchDf, by = c("Players" = "bowler"))
+
+# Merging the data of players who got Man of the Match or not
+man_of_match <- matches %>% count(player_of_match) %>% rename(Player = player_of_match, Man_of_Match = n)
+
+final_df <- full_join(final_df, man_of_match, by = c("Players" = "Player"))
+
+# Replace NA values with 0
+final_df[is.na(final_df)] <- 0
+
+final_df <- final_df %>% mutate(Players = paste(row_number(), Players, sep = ": "))
+
+final_df
+```
+
+```{r}
+final_df$Total_Runs <- as.numeric(final_df$Total_Runs)
+final_df <- final_df %>% mutate(Row_Number = row_number())
+
+ggplot(final_df, aes(x = Man_of_Match, y = Total_Runs, fill = Total_Runs)) + geom_point(aes(color = Total_Runs), size = 2.5, alpha = 1) +   geom_text(aes(label = Row_Number), vjust = -0.5, size = 3, check_overlap = TRUE) + labs(title = "Number of Runs Scored by Players who got Player of the Match", x = "Player of the Match", y = "Number of Runs")  + theme_minimal() +  theme(axis.text.y = element_text(angle = 0, hjust = 1))
+```
+
+```{r}
+final_df$Wicket <- as.numeric(final_df$Wicket)
+final_df <- final_df %>% mutate(Row_Number = row_number())
+
+ggplot(final_df, aes(x = Man_of_Match, y = Wicket, fill = Wicket)) + geom_point(aes(color = Wicket), size = 2.5, alpha = 1) +   geom_text(aes(label = Row_Number), vjust = -0.5, size = 3, check_overlap = TRUE) + labs(title = "Number of Wicket Taken by Different Players", x = "Player of the Match", y = "Number of Wicket")  + theme_minimal() +  theme(axis.text.y = element_text(angle = 0, hjust = 1))
+```
+
+```{r}
+final_df$Man_of_Match <- as.numeric(final_df$Man_of_Match)
+final_df <- final_df %>% mutate(Row_Number = row_number())
+
+ggplot(final_df, aes(x = Matches, y = Man_of_Match)) + geom_point(aes(color = Man_of_Match), size = 2.5, alpha = 0.7) + geom_text(aes(label = Row_Number), vjust = -0.5, size = 3, check_overlap = TRUE) +  labs(title = "Player of the Match by Player", x = "Matches Played", y = "Player of the Match") + theme_minimal() + theme(axis.text.y = element_text(angle = 0, hjust = 1))
+```
+
+```{r}
+final_df$Strike_Rate <- as.numeric(final_df$Strike_Rate)
+final_df <- final_df %>% mutate(Row_Number = row_number())
+
+ggplot(final_df, aes(x = Matches, y = Strike_Rate)) + geom_point(aes(color = Strike_Rate, size = Strike_Rate), alpha = 0.5, size = 2.5) + geom_text(aes(label = Row_Number), vjust = -0.5, size = 3, check_overlap = TRUE) + labs(title = "Batsman Strike Rate by Player", x = "Matches Played", y = "Batting Strike Rate") + scale_color_gradient(low = "red", high = "darkred") + theme_minimal() + theme(axis.text.y = element_text(angle = 0, hjust = 1))
+```
+
+```{r}
+final_df$catches <- as.numeric(final_df$catches)
+final_df <- final_df %>% mutate(Row_Number = row_number())
+
+ggplot(final_df, aes(x = Matches, y = catches)) +
+  geom_point(aes(color = catches, size = catches), alpha = 1, size = 2.5) + geom_text(aes(label = Row_Number), vjust = -0.5, size = 3, check_overlap = TRUE) + labs(title = "Most Catches by Players", x = "Matches Played", y = "Number of Catches") + scale_color_gradient(low = "red", high = "darkred") + theme_minimal() + theme(axis.text.y = element_text(angle = 0, hjust = 1))
+```
+
+```{r}
+final_df$Bowling_Eco <- as.numeric(final_df$Bowling_Eco)
+final_df$Matches <- as.numeric(final_df$Matches)
+final_df <- final_df %>% mutate(Row_Number = row_number())
+
+ggplot(final_df, aes(x = Matches, y = Bowling_Eco)) + geom_point(aes(color = Bowling_Eco, size = Matches), alpha = 1, size = 2.5) + geom_text(aes(label = Row_Number), vjust = -0.5, size = 3, check_overlap = TRUE) + labs(title = "Bowling Economy by Players", x = "Matches Played", y = "Bowling Economy") + scale_color_gradient(low = "lightcoral", high = "darkred") + theme_minimal() + theme(axis.text.x = element_text(angle = 0, hjust = 1))
+```
+
+```{r}
+final_df$Total_6_Runs <- as.numeric(final_df$Total_6_Runs)
+final_df$Matches <- as.numeric(final_df$Matches)
+final_df <- final_df %>% mutate(Row_Number = row_number()) 
+
+ggplot(final_df, aes(x = Matches, y = Total_6_Runs)) + geom_point(aes(color = Total_6_Runs, size = Total_6_Runs), alpha = 1, size = 2.5) + geom_text(aes(label = Row_Number), vjust = -0.5, size = 3, check_overlap = TRUE) +labs(title = "Most 6s by a Batsman", x = "Matches Played", y = "Number of 6s") + scale_color_gradient(low = "lightgreen", high = "darkgreen") + theme_minimal() + theme(axis.text.x = element_text(angle = 0, hjust = 1))
+```
+
+```{r}
+final_df$Total_4_Runs <- as.numeric(final_df$Total_4_Runs)
+final_df$Matches <- as.numeric(final_df$Matches)
+final_df <- final_df %>% mutate(Row_Number = row_number())
+
+ggplot(final_df, aes(x = Matches, y = Total_4_Runs)) + geom_point(aes(color = Total_4_Runs, size = Total_4_Runs), alpha = 1, size = 2.5) +geom_text(aes(label = Row_Number), vjust = -0.5, size = 3, check_overlap = TRUE) + labs(title = "Most 4s by a Batsman", x = "Matches Played",y = "Number of 4s") + scale_color_gradient(low = "lightblue", high = "darkblue") + theme_minimal() + theme(axis.text.x = element_text(angle = 0, hjust = 1))
+```
+
+```{r}
+final_df <- final_df %>% rename(dot_balls = Total_0_Runs)
+final_df$dot_balls <- as.numeric(final_df$dot_balls)
+final_df$Matches <- as.numeric(final_df$Matches)
+final_df <- final_df %>% mutate(Row_Number = row_number())
+
+ggplot(final_df, aes(x = Matches, y = dot_balls)) +geom_point(aes(color = dot_balls, size = dot_balls), alpha = 1, size = 2.5) +geom_text(aes(label = Row_Number), vjust = -0.5, size = 3, check_overlap = TRUE) +labs(title = "Most Dot Balls Faced by a Batsman", x = "Matches Played", y = "Number of Dot Balls Faced") + scale_color_gradient(low = "lightblue", high = "darkblue") + theme_minimal() + theme(axis.text.x = element_text(angle = 0, hjust = 1))
+```
+
+```{r}
+final_df <- final_df %>% mutate(not_out = Matches - Player_Out)
+final_df$Player_Out <- as.numeric(final_df$Player_Out)
+final_df$not_out <- as.numeric(final_df$not_out)
+final_df$Total_Runs <- as.numeric(final_df$Total_Runs)
+final_df <- final_df %>% mutate(Row_Number = row_number())
+
+ggplot(final_df, aes(x = Player_Out, y = not_out)) + geom_point(aes(color = Total_Runs, size = Player_Out), alpha = 1, size = 2.5) + geom_text(aes(label = Row_Number), vjust = -0.5, size = 3, check_overlap = TRUE) + labs(title = "Most Times Out by a Batsman vs Matches Played (Not Out Ratio)", x = "Player Out (Number of Times)", y = "Not Out (Matches Not Out)") + scale_color_gradient(low = "lightblue", high = "darkblue") + theme_minimal() + theme(axis.text.x = element_text(angle = 0, hjust = 1))
+```
+
+```{r}
+final_df_filtered <- final_df %>% filter(Matches > 50)
+final_df_filtered
+```
+
+```{r}
+df_top20 <- final_df_filtered[final_df_filtered$Batting_Avg != Inf, ]
+df_top20 <- df_top20 %>% arrange(desc(Batting_Avg)) %>% head(20)
+
+ggplot(df_top20, aes(x = reorder(Players, -Batting_Avg), y = Batting_Avg)) + geom_bar(stat = "identity", aes(fill = Batting_Avg)) +labs(title = "Top 20 Batsmen Based on Batting Average",x = "Player",y = "Batting Average") +scale_fill_gradient(low = "lightblue", high = "darkblue") +theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readabilit
+
+```
+
+```{r}
+df_top20 <- final_df_filtered %>% arrange(desc(Wicket)) %>% head(20)
+
+ggplot(df_top20, aes(x = reorder(Players, -Wicket), y = Wicket)) + geom_bar(stat = "identity", aes(fill = Wicket)) + labs(title = 'Top 20 Bowlers Based on Wickets', x = 'Player', y = 'Wickets') + scale_fill_gradient(low = "lightblue", high = "darkblue") + theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+head(matches, 2)
+```
+
+```{r}
+matches <- matches %>% mutate(WinningTeam = ifelse(winner == "N", team1, winner))
+
+wins <- matches %>% count(WinningTeam) %>% arrange(desc(n))
+
+top_teams <- wins %>% top_n(15, n)
+
+ggplot(top_teams, aes(x = reorder(WinningTeam, -n), y = n)) + geom_bar(stat = "identity", aes(fill = WinningTeam)) + labs(title = "Top 10 Best Performing Teams", x = "Team", y = "Number of Wins") +  scale_fill_brewer(palette = "Set3") + theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+matches <- matches %>% mutate(WinningTeam = ifelse(winner == "N", team2, winner))
+
+wins <- matches %>% count(WinningTeam) %>% arrange(n)
+
+least_teams <- wins %>% top_n(-10, n)
+
+ggplot(least_teams, aes(x = reorder(WinningTeam, n), y = n)) + geom_bar(stat = "identity", fill = "lightcoral", color = "black") + labs(title = "Top 10 Least Performing Teams", x = "Team", y = "Number of Wins") + theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+
+# Read the data
+matches <- read.csv("https://raw.githubusercontent.com/simranjeet97/IPL2023_WinningPrediction_EDA_Dashboard/main/IPL2023_Data/IPL_Matches_2008_2022.csv")
+
+# Drop unwanted columns and remove rows with NA values
+matches <- matches %>%
+  select(-City, -ID, -method) %>%
+  na.omit()
+
+# Extract SEASON_INT and SEASON_END_INT
+matches <- matches %>%
+  mutate(SEASON_INT = as.numeric(substr(Season, 1, 4)),
+         SEASON_END_INT = ifelse(nchar(Season) > 5, 
+                                 as.numeric(paste0("20", substr(Season, 6, 7))), 
+                                 SEASON_INT))
+
+# Convert the Date column to a Date object
+matches$Date <- as.Date(matches$Date, format = "%Y-%m-%d")
+
+# Group by Season and select the last match of each season
+last_matches <- matches %>%
+  arrange(Date) %>%
+  group_by(Season) %>%
+  slice_tail(n = 1) %>%
+  ungroup()
+
+# Select the Season end year and winning team
+winning_teams <- last_matches %>%
+  select(SEASON_END_INT, WinningTeam)
+
+# Create the bar plot
+ggplot(winning_teams, aes(x = WinningTeam, y = SEASON_END_INT, fill = as.factor(SEASON_END_INT))) +
+  geom_col() +
+  labs(title = "IPL Winning Teams by Year",
+       x = "Winning Team",
+       y = "Season End Year",
+       fill = "Season Year") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+```{r}
+head(final_df)
+
+final_df <- final_df %>% mutate(Batting_Avg = ifelse(is.infinite(Batting_Avg), NA, Batting_Avg)) %>% filter(!is.na(Batting_Avg))
+
+final_df <- final_df %>% mutate(Bowling_Eco = ifelse(is.infinite(Bowling_Eco), NA, Bowling_Eco)) %>% filter(!is.na(Bowling_Eco))
+
+final_df <- final_df %>% mutate(Bowl_Strike_Rate = ifelse(is.infinite(Bowl_Strike_Rate), NA, Bowl_Strike_Rate)) %>% filter(!is.na(Bowl_Strike_Rate))
+
+numeric_df <- final_df %>% select_if(is.numeric)
+
+correlation_matrix <- cor(numeric_df, use = "complete.obs")
+
+melted_correlation <- melt(correlation_matrix)
+melted_correlation <- melted_correlation %>% filter(!is.na(value) & value >= -1 & value <= 1)
+
+heatmap_plot <- ggplot(data = melted_correlation, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") + 
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1, 1), name = "Correlation") + geom_text(aes(label = round(value, 2)), color = "black", size = 2) + theme_minimal(base_size = 10) + theme(axis.text.x = element_text(angle = 90, hjust = 1), plot.title = element_text(hjust = 0.5)) + labs(title = "Heatmap Confusion Matrix", x = "Variables", y = "Variables")
+
+print(heatmap_plot)
+
+output_path <- "C:/Users/omhas/Documents/IPL Project/correlation_heatmap.png"
+
+ggsave(output_path, plot = heatmap_plot, width = 20, height = 10, dpi = 300, limitsize = FALSE)
+```
+
+```{r}
+matches<-read.csv("C:/Users/omhas/Documents/IPL Project/Dataset/matches.csv")
+head(matches)
+deliveries<-read.csv("C:/Users/omhas/Documents/IPL Project/Dataset/deliveries.csv")
+head(deliveries)
+```
+
+```{r}
+inning_score<- deliveries %>% group_by(match_id, inning) %>% summarise(total_runs = sum(total_runs),.groups = 'drop') %>% filter(inning == 1)
+head(inning_score)
+```
+```{r}
+inning_score <- inning_score %>% mutate(target = total_runs + 1)
+head(inning_score)
+```
+```{r}
+colnames(matches)[colnames(matches) == "id"] <- "id"
+colnames(inning_score)[colnames(inning_score) == "match_id"] <- "id"
+matches <- matches %>% left_join(inning_score %>% select(id, target), by = "id")
+head(matches)
+```
+
+```{r}
+# Replace occurrences of 'Delhi Daredevils' with 'Delhi Capitals'
+matches$team1 <- gsub('Delhi Daredevils', 'Delhi Capitals', matches$team1)
+matches$team2 <- gsub('Delhi Daredevils', 'Delhi Capitals', matches$team2)
+matches$winner <- gsub('Delhi Daredevils', 'Delhi Capitals', matches$winner)
+
+# Replace occurrences of 'Kings XI Punjab' with 'Punjab Kings'
+matches$team1 <- gsub('Kings XI Punjab', 'Punjab Kings', matches$team1)
+matches$team2 <- gsub('Kings XI Punjab', 'Punjab Kings', matches$team2)
+matches$winner <- gsub('Kings XI Punjab', 'Punjab Kings', matches$winner)
+
+# Replace occurrences of 'Deccan Chargers' with 'Sunrisers Hyderabad'
+matches$team1 <- gsub('Deccan Chargers', 'Sunrisers Hyderabad', matches$team1)
+matches$team2 <- gsub('Deccan Chargers', 'Sunrisers Hyderabad', matches$team2)
+matches$winner <- gsub('Deccan Chargers', 'Sunrisers Hyderabad', matches$winner)
+
+# Replace occurrences of 'Rising Pune Supergiant' with 'Pune Warriors'
+matches$team1 <- gsub('Rising Pune Supergiant', 'Pune Warriors', matches$team1)
+matches$team2 <- gsub('Rising Pune Supergiant', 'Pune Warriors', matches$team2)
+matches$winner <- gsub('Rising Pune Supergiant', 'Pune Warriors', matches$winner)
+
+# Replace occurrences of 'Rising Pune Supergiants' with 'Pune Warriors'
+matches$team1 <- gsub('Rising Pune Supergiants', 'Pune Warriors', matches$team1)
+matches$team2 <- gsub('Rising Pune Supergiants', 'Pune Warriors', matches$team2)
+matches$winner <- gsub('Rising Pune Supergiants', 'Pune Warriors', matches$winner)
+
+# Replace occurrences of 'Gujarat Lions' with 'Gujarat Titans'
+matches$team1 <- gsub('Gujarat Lions', 'Gujarat Titans', matches$team1)
+matches$team2 <- gsub('Gujarat Lions', 'Gujarat Titans', matches$team2)
+matches$winner <- gsub('Gujarat Lions', 'Gujarat Titans', matches$winner)
+
+head(matches)
+```
+
+```{r}
+teams2024<- c('Rajasthan Royals','Royal Challengers Bangalore','Sunrisers Hyderabad', 'Delhi Capitals', 'Chennai Super Kings','Gujarat Titans', 'Lucknow Super Giants', 'Kolkata Knight Riders','Punjab Kings', 'Mumbai Indians')
+
+matches <- matches %>% filter(team1 %in% teams2024) %>% filter(team2 %in% teams2024) %>% filter(winner %in% teams2024)
+unique_teams <- unique(matches$team1)
+print(unique_teams)
+head(matches)
+```
+```{r}
+matches <- matches %>% select(id, city, team1, team2, winner, target) %>% na.omit()
+head(matches)
+```
+```{r}
+deliveries$batting_team <- str_replace_all(deliveries$batting_team, 'Delhi Daredevils', 'Delhi Capitals')
+deliveries$batting_team <- str_replace_all(deliveries$batting_team, 'Kings XI Punjab', 'Punjab Kings')
+deliveries$batting_team <- str_replace_all(deliveries$batting_team, 'Deccan Chargers', 'Sunrisers Hyderabad')
+deliveries$batting_team <- str_replace_all(deliveries$batting_team, 'Rising Pune Supergiant', 'Pune Warriors')
+deliveries$batting_team <- str_replace_all(deliveries$batting_team, 'Rising Pune Supergiants', 'Pune Warriors')
+deliveries$batting_team <- str_replace_all(deliveries$batting_team, 'Pune Warriorss', 'Pune Warriors')
+deliveries$batting_team <- str_replace_all(deliveries$batting_team, 'Gujarat Lions', 'Gujarat Titans')
+deliveries <- deliveries %>% filter(batting_team %in% teams2024)
+head(deliveries)
+```
+```{r}
+colnames(matches)[colnames(matches) == "ID"] <- "id"
+colnames(deliveries)[colnames(deliveries) == "match_id"] <- "id"
+final <- matches %>% inner_join(deliveries, by = "id")
+head(final)
+```
+```{r}
+final <- final %>% filter(inning == 2)
+head(final)
+```
+```{r}
+final$current_score <- ave(final$total_run, final$id, FUN = cumsum)
+head(final)
+```
+```{r}
+final$runs_left <- ifelse(final$target - final$current_score >= 0, final$target - final$current_score, 0)
+head(final)
+```
+```{r}
+final$balls_left <- ifelse(120 - final$over * 6 - final$ball >= 0, 120 - final$over * 6 - final$ball, 0)
+head(final)
+```
+
+```{r}
+final <- final %>% group_by(id) %>% mutate(wickets_left = 10 - cumsum(is_wicket)) %>% ungroup()
+head(final)
+```
+```{r}
+final$current_run_rate <- (final$current_score * 6) / (120 - final$balls_left)
+final$required_run_rate <- ifelse(final$balls_left > 0, final$runs_left * 6 / final$balls_left, 0)
+head(final)
+```
+```{r}
+result <- function(row) {if (row["batting_team"] == row["winner"]) {return(1)} else {return(0)}}
+
+final$result <- apply(final, 1, result)
+final
+```
+```{r}
+if (!"BowlingTeam" %in% colnames(final)) {final$BowlingTeam <- NA}
+if (!"BattingTeam" %in% colnames(final)) {final$BattingTeam <- NA}
+
+# Update BowlingTeam
+index1 <- which(final$team2 == final$batting_team)
+index2 <- which(final$team1 == final$batting_team)
+
+final$BowlingTeam[index1] <- final$team1[index1]
+final$BowlingTeam[index2] <- final$team2[index2]
+
+# Update BattingTeam
+index3 <- which(final$team2 == final$bowling_team)
+index4 <- which(final$team1 == final$bowling_team)
+
+final$BattingTeam[index3] <- final$team1[index3]
+final$BattingTeam[index4] <- final$team2[index4]
+
+head(final)
+```
+
+```{r}
+winningPred <- final %>% select(BattingTeam, BowlingTeam, city, runs_left, balls_left, wickets_left, current_run_rate, required_run_rate, target, result)
+head(winningPred)
+```
+```{r}
+sample_n(winningPred, 1)
+```
+```{r}
+trf <- dummyVars(~ BattingTeam + BowlingTeam + city + balls_left + wickets_left + current_run_rate  + target, data = winningPred, fullRank = TRUE)
+X <- predict(trf, newdata = winningPred)
+y <- winningPred$result
+dim(X)
+length(y)
+```
+
+```{r}
+train_indices <- createDataPartition(y, p = 0.7, list = FALSE)
+
+# Split the dataset
+X_train <- X[train_indices, ]
+X_test <- X[-train_indices, ]
+y_train <- y[train_indices]
+y_test <- y[-train_indices]
+   
+preProcessObj <- preProcess(X_train, method = 'medianImpute') 
+X_train <- predict(preProcessObj, X_train)
+X_train <- apply(X_train, 2, function(col) ifelse(is.na(col), Mode(col), col))
+X_test <- predict(preProcessObj, X_test)
+
+X_train <- as.data.frame(X_train)
+X_test <- as.data.frame(X_test)
+y_train <- as.factor(y_train)
+y_test <- as.factor(y_test)
+```
+
+## Random Forest
+```{r}
+# Train the Random Forest model
+rf_model <- randomForest(x = X_train, y = as.factor(y_train), ntree =200, mtry = sqrt(ncol(X_train)))
+
+# Predict on test data
+y_pred_rf <- predict(rf_model, newdata = X_test)
+
+confusion_matrix_rf <- confusionMatrix(y_pred_rf, as.factor(y_test))
+print(confusion_matrix_rf)
+
+conf_matrix_table_rf <- as.data.frame(confusion_matrix_rf$table)
+
+colnames(conf_matrix_table_rf) <- c("Predicted", "Actual", "Freq")
+
+ggplot(data = conf_matrix_table_rf, aes(x = Actual, y = Predicted, fill = Freq)) + geom_tile() + geom_text(aes(label = Freq), color = "white", size = 5) + scale_fill_gradient(low = "lightblue", high = "blue") + theme_minimal() + labs(title = "Confusion Matrix- Random Forest", x = "Actual", y = "Predicted") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Logistic regression
+```{r}
+logistic_model <- glm(y_train ~ ., data = X_train, family = binomial)
+y_pred_prob <- predict(logistic_model, newdata = X_test, type = "response")
+y_pred_lr <- ifelse(y_pred_prob > 0.5, 1, 0)
+
+confusion_matrix_lr <- confusionMatrix(as.factor(y_pred_lr), as.factor(y_test))
+print(confusion_matrix_lr)
+
+conf_matrix_table_lr <- as.data.frame(confusion_matrix_lr$table)
+colnames(conf_matrix_table_lr) <- c("Predicted", "Actual", "Freq")
+
+ggplot(data = conf_matrix_table_lr, aes(x = Actual, y = Predicted, fill = Freq)) +  geom_tile() +  geom_text(aes(label = Freq), color = "white", size = 5) +  scale_fill_gradient(low = "lightblue", high = "blue") + theme_minimal() +  labs(title = "Confusion Matrix- Logistic Regression", x = "Actual", y = "Predicted") +  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Naive Base
+```{r}
+naive_bayes_model <- naiveBayes(y_train ~ ., data = X_train, priximity = TRUE)
+
+y_pred_nb <- predict(naive_bayes_model, newdata = X_test, type = "class")
+
+confusion_matrix_nb <- confusionMatrix(as.factor(y_pred_nb), as.factor(y_test))
+print(confusion_matrix_nb)
+
+conf_matrix_table_nb <- as.data.frame(confusion_matrix_nb$table)
+colnames(conf_matrix_table_nb) <- c("Predicted", "Actual", "Freq")
+
+ggplot(data = conf_matrix_table_nb, aes(x = Actual, y = Predicted, fill = Freq)) +  geom_tile() +  geom_text(aes(label = Freq), color = "white", size = 5) +  scale_fill_gradient(low = "lightblue", high = "blue") +  theme_minimal() +  labs(title = "Confusion Matrix- Naive Bayes", x = "Actual", y = "Predicted") +  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Decision Tree
+```{r}
+
+# Control parameters for decision tree
+control_params <- rpart.control(maxdepth = 20, minbucket = 3)
+
+# Train the model
+my_decision_tree_model <- rpart(as.factor(y_train) ~ ., data = as.data.frame(X_train), method = "class", control = control_params)
+val_predictions <- predict(my_decision_tree_model, X_test, type = "class")
+
+confusion_matrix_tree <- confusionMatrix(as.factor(val_predictions), as.factor(y_test))
+print(confusion_matrix_tree)
+
+conf_matrix_table <- as.data.frame(confusion_matrix_tree$table)
+colnames(conf_matrix_table) <- c("Predicted", "Actual", "Freq")
+
+ggplot(data = conf_matrix_table, aes(x = Actual, y = Predicted, fill = Freq)) + geom_tile() + geom_text(aes(label = Freq), color = "white", size = 5) + scale_fill_gradient(low = "lightblue", high = "blue") + theme_minimal() + labs(title = "Confusion Matrix - Decision Tree", x = "Actual", y = "Predicted") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+## AUC-ROC Curve.
+```{r}
+prob_decision_tree <- predict(my_decision_tree_model, as.data.frame(X_test), type = "prob")[, 2]
+roc_decision_tree <- roc(as.numeric(as.factor(y_test)) - 1, prob_decision_tree)
+
+prob_rf <- predict(rf_model, newdata = X_test, type = "prob")[, 2]
+roc_rf <- roc(as.numeric(as.factor(y_test)) - 1, prob_rf)
+
+y_pred_prob_lr <- predict(logistic_model, newdata = X_test, type = "response")
+roc_logistic <- roc(as.numeric(as.factor(y_test)) - 1, y_pred_prob_lr)
+
+prob_nb <- predict(naive_bayes_model, newdata = X_test, type = "raw")[, 2]
+roc_nb <- roc(as.numeric(as.factor(y_test)) - 1, prob_nb)
+```
+
+```{r}
+# Function to extract and standardize ROC curve data
+get_roc_data <- function(roc_obj, model_name) {data.frame(TPR = roc_obj$sensitivities, FPR = 1 - roc_obj$specificities, Model = model_name)}
+
+# Combine the ROC data frames in the correct sequence
+roc_combined <- rbind(get_roc_data(roc_nb, "Naive Bayes"), get_roc_data(roc_decision_tree, "Decision Tree"), get_roc_data(roc_logistic, "Logistic Regression"), get_roc_data(roc_rf, "Random Forest"))
+
+# Update the plot with corrected labels and colors
+ggplot(roc_combined, aes(x = FPR, y = TPR, color = Model)) + geom_line(linewidth = 1.2) + geom_abline(slope = 1, intercept = 0, linetype = "dashed") + theme_minimal() + labs(title = "AUC-ROC Curves", x = "False Positive Rate (FPR)", y = "True Positive Rate (TPR)") + theme(plot.title = element_text(hjust = 0.5)) + scale_color_manual( values = c("Naive Bayes" = "red", "Decision Tree" = "blue","Logistic Regression" = "purple","Random Forest" = "green")) + annotate("text", x = 0.8, y = 0.2, label = paste("AUC (NB):", round(auc(roc_nb), 3)), color = "red") + annotate("text", x = 0.8, y = 0.15, label = paste("AUC (DT):", round(auc(roc_decision_tree), 3)), color = "blue") + annotate("text", x = 0.8, y = 0.1, label = paste("AUC (LR):", round(auc(roc_logistic), 3)), color = "purple") + annotate("text", x = 0.8, y = 0.05, label = paste("AUC (RF):", round(auc(roc_rf), 3)), color = "green")
+```
+
