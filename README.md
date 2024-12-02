@@ -16,7 +16,7 @@ The **IPL Winning Team Prediction** project leverages machine learning technique
 ---
 
 ## Table of Contents  
-1. [Project Setup](#project-setup)  
+1. [Project Setup](#Project-Setup)  
 2. [Data](#data)  
 3. [Modeling](#modeling)  
 4. [Results](#results)  
@@ -25,7 +25,7 @@ The **IPL Winning Team Prediction** project leverages machine learning technique
 
 ---
 
-## 🛠️ Project Setup  
+## 🛠️ Project-Setup  
 
 ### 📋 Prerequisites  
 Ensure the following tools are installed:  
@@ -37,3 +37,8 @@ Ensure the following tools are installed:
    ```bash  
    git clone https://github.com/yourusername/IPL-Winning-Team-Prediction.git  
    cd IPL-Winning-Team-Prediction  
+2. **Open the RMarkdown file**:
+   - Open [IPL Winning Team Prediction.Rmd](IPL-Winning-Team-Prediction.Rmd) in RStudio for Visualization.
+   - Open [Random-Forest Model.R](Random-Forest-Model.R) for running the model.
+3. **Run the project**: Execute all code cells to preprocess data, train models, and generate predictions.
+
