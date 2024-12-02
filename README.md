@@ -16,13 +16,13 @@ The **IPL Winning Team Prediction** project leverages machine learning technique
 ---
 
 ## Table of Contents  
-1. [Project Setup](#Project-Setup)  
-2. [Data](Data)
-3. [Data Visualizations](#Data-Visualizations)
-4. [Modeling](#modeling)  
-5. [Results](#results)  
-6. [Visualizations](#visualizations)  
-7. [Future Scope](#future-scope)  
+1. Project Setup
+2. Data
+3. Data Visualizations
+4. Modeling
+5. Results
+6. Future Scope
+7. Contact
 
 ---
 
@@ -159,3 +159,8 @@ The following algorithms were implemented:
 - **🕒 Real-time Predictions**: Incorporate live match data for dynamic forecasting.
 - **🤝 Advanced Models**: Explore XGBoost and other ensemble methods for improved accuracy.
 - **💡 Explainability**: Use SHAP values to interpret predictions better.
+
+---
+
+## Contact
+For any questions or feedback, please contact [omhase9955@gmail.com](omhase9955@gmail.com).
