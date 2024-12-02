@@ -17,7 +17,7 @@ The **IPL Winning Team Prediction** project leverages machine learning technique
 
 ## Table of Contents  
 1. [Project Setup](#Project-Setup)  
-2. [Data](##Data)
+2. [Data](Data)
 3. [Data Visualizations](#Data-Visualizations)
 4. [Modeling](#modeling)  
 5. [Results](#results)  
