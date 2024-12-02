@@ -17,11 +17,12 @@ The **IPL Winning Team Prediction** project leverages machine learning technique
 
 ## Table of Contents  
 1. [Project Setup](#Project-Setup)  
-2. [Data](#Data)  
-3. [Modeling](#modeling)  
-4. [Results](#results)  
-5. [Visualizations](#visualizations)  
-6. [Future Scope](#future-scope)  
+2. [Data](##Data)
+3. [Data Visualizations](#Data-Visualizations)
+4. [Modeling](#modeling)  
+5. [Results](#results)  
+6. [Visualizations](#visualizations)  
+7. [Future Scope](#future-scope)  
 
 ---
 
@@ -56,12 +57,72 @@ Ensure the following tools are installed:
 
 ---
 
-## 📊 Visualizations
+## 📊 Data Visualizations
 
 A. Plot 1: Runs by Man of the Match
 
+![Runs by Man of the Match](Data-Visualization-Images/Runs-by-Man-of-the-Match.png)
 
-B. 
+
+B. Plot 2: Wickets by Player of Match
+
+![Wickets by Player of Match](Data-Visualization-Images/Wickets-by-Player-of-Match.png)
+
+C. Plot 3: Man of the Match
+
+![Man of the Match](Data-Visualization-Images/Man-of-the-Match.png)
+
+D. Plot 4: Batsman Strike Rate
+
+![Batsman Strike Rate](Data-Visualization-Images/Batsman-Strike-Rate.png)
+
+E. Plot 5: Catches by Players
+
+![Catches by Players](Data-Visualization-Images/Catches-by-Players.png)
+
+F. Plot 6: Bowling Economy
+
+![Bowling Economy](Data-Visualization-Images/Bowling-Economy.png)
+
+G. Plot 7: Most Sixes
+
+![Most Sixes](Data-Visualization-Images/Most-Sixes.png)
+
+H. Plot 8: Most Fours
+
+![Most Fours](Data-Visualization-Images/Most-Fours.png)
+
+I. Plot 9: Most Dot Balls
+
+![Most Dot Balls](Data-Visualization-Images/Most-Dot-Balls.png)
+
+J. Plot 10: Ratio of Out vs Not Out
+
+![Ratio of Out vs Not Out](Data-Visualization-Images/Ratio-of-Out-vs-Not-Out.png)
+
+K. Plot 11: Top 20 Batsman
+
+![Top 20 Batsman](Data-Visualization-Images/Top-20-Batsman.png)
+
+L. Plot 12: Top 20 Bowlers
+
+![Top 20 Bowlers](Data-Visualization-Images/Top-20-Bowlers.png)
+
+M. Plot 13: Top 10 Teams
+
+![Top 10 Teams](Data-Visualization-Images/Top-10-Teams.png)
+
+N. Plot 14: Top 10 Worst Teams
+
+![Top 10 Worst Teams](Data-Visualization-Images/Top-10-Worst-Teams.png)
+
+O. Plot 15: IPL Teams with IPL Cup
+
+![IPL Teams with IPL Cup](Data-Visualization-Images/IPL-Teams-with-IPL-Cup.png)
+
+P. Plot 16: Heatmap Confusion Matrix
+
+![Heatmap Confusion Matrix](Data-Visualization-Images/Heatmap-Confusion-Matrix.png)
 
 ---
 
